@@ -1,0 +1,828 @@
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Plus, X, Minus, TrendingDown, Scale, Utensils, Check, Trash2, Settings2 } from "lucide-react";
+
+const INK = "#262B23";
+const PAPER = "#EDE7D9";
+const CARD = "#FBF9F2";
+const GREEN = "#3F6E4A";
+const RUST = "#B5482A";
+const AMBER = "#A8792C";
+const BLUE = "#3E6B8C";
+const MUTED = "#8C8672";
+const LINE = "#D8D0BC";
+
+const MEALS = [
+  { key: "colazione", label: "Colazione" },
+  { key: "pranzo", label: "Pranzo" },
+  { key: "cena", label: "Cena" },
+  { key: "spuntini", label: "Spuntini" },
+];
+
+const DEFAULT_PRODUCTS = [
+  { id: "p1", name: "Pancarrè Mulino Bianco", portion: "1 fetta", kcal: 51, protein: 1.4, carbs: 8.9, fat: 0.9 },
+  { id: "p2", name: "Yogurt greco Fage Total 0%", portion: "100 g", kcal: 54, protein: 10, carbs: 3.6, fat: 0.4 },
+  { id: "p3", name: "Prosciutto crudo magro (2 fette)", portion: "2 fette", kcal: 60, protein: 9, carbs: 0, fat: 2 },
+];
+
+// Database offline di alimenti comuni, valori medi per 100g (nessuna marca specifica)
+const FOOD_DB = [
+  { name: "Miele", kcal: 304, protein: 0.3, carbs: 82, fat: 0, presets: [{ label: "1 cucchiaino", grams: 7 }, { label: "1 cucchiaio", grams: 21 }] },
+  { name: "Zucchero", kcal: 400, protein: 0, carbs: 100, fat: 0, presets: [{ label: "1 cucchiaino", grams: 4 }, { label: "1 cucchiaio", grams: 12 }] },
+  { name: "Olio extravergine d'oliva", kcal: 884, protein: 0, carbs: 0, fat: 100, presets: [{ label: "1 cucchiaino", grams: 5 }, { label: "1 cucchiaio", grams: 15 }] },
+  { name: "Olio di semi", kcal: 884, protein: 0, carbs: 0, fat: 100, presets: [{ label: "1 cucchiaino", grams: 5 }, { label: "1 cucchiaio", grams: 15 }] },
+  { name: "Burro", kcal: 717, protein: 0.9, carbs: 0.1, fat: 81, presets: [{ label: "1 cucchiaino", grams: 5 }, { label: "1 noce", grams: 10 }] },
+  { name: "Pasta (cruda)", kcal: 358, protein: 12.5, carbs: 71, fat: 1.5 },
+  { name: "Riso (crudo)", kcal: 332, protein: 6.7, carbs: 74, fat: 0.6 },
+  { name: "Pane comune", kcal: 275, protein: 8, carbs: 55, fat: 1 },
+  { name: "Patate", kcal: 77, protein: 2, carbs: 17, fat: 0.1 },
+  { name: "Uova", kcal: 143, protein: 12.5, carbs: 1, fat: 10 },
+  { name: "Latte parzialmente scremato", kcal: 46, protein: 3.3, carbs: 4.8, fat: 1.5 },
+  { name: "Parmigiano", kcal: 392, protein: 33, carbs: 0, fat: 29 },
+  { name: "Petto di pollo", kcal: 165, protein: 31, carbs: 0, fat: 3.6 },
+  { name: "Tonno sott'olio (sgocciolato)", kcal: 192, protein: 26, carbs: 0, fat: 10 },
+  { name: "Tonno al naturale", kcal: 116, protein: 26, carbs: 0, fat: 1 },
+  { name: "Salmone", kcal: 208, protein: 20, carbs: 0, fat: 13 },
+  { name: "Mandorle", kcal: 579, protein: 21, carbs: 22, fat: 50 },
+  { name: "Banana", kcal: 89, protein: 1.1, carbs: 23, fat: 0.3 },
+  { name: "Mela", kcal: 52, protein: 0.3, carbs: 14, fat: 0.2 },
+  { name: "Nutella", kcal: 539, protein: 6.3, carbs: 57, fat: 31, presets: [{ label: "1 cucchiaino", grams: 5 }, { label: "1 cucchiaio", grams: 15 }] },
+  { name: "Yogurt bianco intero", kcal: 61, protein: 3.5, carbs: 4.7, fat: 3.3 },
+  { name: "Mozzarella", kcal: 253, protein: 18, carbs: 1, fat: 19 },
+  { name: "Pomodoro", kcal: 18, protein: 0.9, carbs: 3.9, fat: 0.2 },
+  { name: "Insalata verde", kcal: 15, protein: 1.4, carbs: 2.9, fat: 0.2 },
+  { name: "Cioccolato fondente", kcal: 546, protein: 7.8, carbs: 46, fat: 31 },
+  { name: "Biscotti secchi", kcal: 440, protein: 7, carbs: 75, fat: 12 },
+  { name: "Avena (fiocchi)", kcal: 389, protein: 17, carbs: 66, fat: 7 },
+  { name: "Fagioli (cotti)", kcal: 127, protein: 8.7, carbs: 20, fat: 0.5 },
+  { name: "Lenticchie (cotte)", kcal: 116, protein: 9, carbs: 20, fat: 0.4 },
+  { name: "Ceci (cotti)", kcal: 164, protein: 8.9, carbs: 27, fat: 2.6 },
+  { name: "Carne macinata magra", kcal: 137, protein: 21, carbs: 0, fat: 5 },
+  { name: "Prosciutto cotto", kcal: 145, protein: 18, carbs: 1.5, fat: 7.5 },
+  { name: "Bresaola", kcal: 151, protein: 32, carbs: 0.5, fat: 2.6 },
+  { name: "Ricotta", kcal: 146, protein: 8.8, carbs: 3.5, fat: 10.9 },
+  { name: "Vino rosso", kcal: 85, protein: 0.1, carbs: 2.6, fat: 0 },
+  { name: "Birra", kcal: 43, protein: 0.5, carbs: 3.6, fat: 0 },
+];
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatDateLabel(iso) {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
+}
+
+function emptyDay() {
+  return { meals: { colazione: [], pranzo: [], cena: [], spuntini: [] }, consumed: null };
+}
+
+function num(v, fallback = 0) {
+  const n = parseFloat(String(v).replace(",", "."));
+  return isNaN(n) ? fallback : n;
+}
+
+// Stima Deurenberg (basata su BMI): niente misure a mano, solo peso/altezza/età/sesso
+function estimateBodyComp(kg, heightCm, age, sex) {
+  if (!kg || !heightCm || !age || !sex) return null;
+  const heightM = heightCm / 100;
+  const bmi = kg / (heightM * heightM);
+  const sexFactor = sex === "M" ? 1 : 0;
+  let fatPct = 1.2 * bmi + 0.23 * age - 10.8 * sexFactor - 5.4;
+  fatPct = Math.max(5, Math.min(55, fatPct));
+  const fatKg = kg * (fatPct / 100);
+  const leanKg = kg - fatKg;
+  return { fatPct: +fatPct.toFixed(1), leanKg: +leanKg.toFixed(1) };
+}
+
+export default function DeficitTracker() {
+  const [data, setData] = useState({ products: DEFAULT_PRODUCTS, days: {}, weights: [], profile: null });
+  const [loaded, setLoaded] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const editedRef = useRef(false);
+  const lastFailedRef = useRef(null);
+  const [date, setDate] = useState(todayISO());
+  const [tab, setTab] = useState("oggi");
+  const [addMealKey, setAddMealKey] = useState(null);
+  const [customName, setCustomName] = useState("");
+  const [customKcal, setCustomKcal] = useState("");
+  const [customProtein, setCustomProtein] = useState("");
+  const [customCarbs, setCustomCarbs] = useState("");
+  const [customFat, setCustomFat] = useState("");
+  const [qty, setQty] = useState("1");
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [foodQuery, setFoodQuery] = useState("");
+  const [selectedFood, setSelectedFood] = useState(null);
+  const [foodGrams, setFoodGrams] = useState("100");
+  const [showManual, setShowManual] = useState(false);
+  const [consumedInput, setConsumedInput] = useState("");
+  const [weightInput, setWeightInput] = useState("");
+  const [showProfile, setShowProfile] = useState(false);
+  const [heightInput, setHeightInput] = useState("");
+  const [ageInput, setAgeInput] = useState("");
+  const [sexInput, setSexInput] = useState("");
+  const [newProdName, setNewProdName] = useState("");
+  const [newProdPortion, setNewProdPortion] = useState("");
+  const [newProdKcal, setNewProdKcal] = useState("");
+  const [newProdProtein, setNewProdProtein] = useState("");
+  const [newProdCarbs, setNewProdCarbs] = useState("");
+  const [newProdFat, setNewProdFat] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await window.storage.get("tracker-data", false);
+        if (res && res.value) {
+          const parsed = JSON.parse(res.value);
+          const merged = { products: DEFAULT_PRODUCTS, days: {}, weights: [], profile: null, ...parsed };
+          if (!editedRef.current) {
+            setData(merged);
+            if (parsed.profile) {
+              setHeightInput(String(parsed.profile.heightCm || ""));
+              setAgeInput(String(parsed.profile.age || ""));
+              setSexInput(parsed.profile.sex || "");
+            }
+          }
+        }
+      } catch (e) {
+        // nessun dato salvato in precedenza, si parte dai valori di default già a video
+      }
+      setLoaded(true);
+    })();
+  }, []);
+
+  const [errorDetail, setErrorDetail] = useState("");
+
+  const trySave = useCallback(async (next, attempts = 3) => {
+    let lastErr = "";
+    for (let i = 0; i < attempts; i++) {
+      try {
+        const res = await window.storage.set("tracker-data", JSON.stringify(next), false);
+        if (res) return true;
+        lastErr = "risposta vuota dal server";
+      } catch (e) {
+        lastErr = (e && (e.message || e.toString())) || "errore sconosciuto";
+        // fallback: prova senza il parametro shared, nel caso l'ambiente non lo supporti
+        try {
+          const res2 = await window.storage.set("tracker-data", JSON.stringify(next));
+          if (res2) return true;
+        } catch (e2) {
+          lastErr = (e2 && (e2.message || e2.toString())) || lastErr;
+        }
+      }
+      if (i < attempts - 1) await new Promise((r) => setTimeout(r, 500));
+    }
+    setErrorDetail(lastErr);
+    return false;
+  }, []);
+
+  const persist = useCallback(async (next) => {
+    editedRef.current = true;
+    setData(next);
+    const ok = await trySave(next);
+    setSaveError(!ok);
+    lastFailedRef.current = ok ? null : next;
+  }, [trySave]);
+
+  const retrySave = useCallback(async () => {
+    if (!lastFailedRef.current) return;
+    const ok = await trySave(lastFailedRef.current);
+    setSaveError(!ok);
+    if (ok) lastFailedRef.current = null;
+  }, [trySave]);
+
+  const day = data.days[date] || emptyDay();
+  const profile = data.profile;
+
+  const setDay = (nextDay) => {
+    const nextDays = { ...data.days, [date]: nextDay };
+    persist({ ...data, days: nextDays });
+  };
+
+  const totals = useMemo(() => {
+    let kcal = 0, protein = 0, carbs = 0, fat = 0;
+    MEALS.forEach((m) => {
+      (day.meals[m.key] || []).forEach((item) => {
+        kcal += item.kcal;
+        protein += item.protein || 0;
+        carbs += item.carbs || 0;
+        fat += item.fat || 0;
+      });
+    });
+    return { kcal: Math.round(kcal), protein: Math.round(protein), carbs: Math.round(carbs), fat: Math.round(fat) };
+  }, [day]);
+
+  const foodMatches = useMemo(() => {
+    if (!foodQuery.trim()) return [];
+    const q = foodQuery.trim().toLowerCase();
+    return FOOD_DB.filter((f) => f.name.toLowerCase().includes(q)).slice(0, 6);
+  }, [foodQuery]);
+
+  const deficit = day.consumed != null ? Math.round(day.consumed - totals.kcal) : null;
+
+  const addItemToMeal = (mealKey, item) => {
+    const nextMeals = { ...day.meals, [mealKey]: [...(day.meals[mealKey] || []), item] };
+    setDay({ ...day, meals: nextMeals });
+  };
+
+  const removeItemFromMeal = (mealKey, idx) => {
+    const next = [...(day.meals[mealKey] || [])];
+    next.splice(idx, 1);
+    setDay({ ...day, meals: { ...day.meals, [mealKey]: next } });
+  };
+
+  const openAdd = (mealKey) => {
+    setAddMealKey(mealKey);
+    setSelectedProduct(null);
+    setSelectedFood(null);
+    setFoodQuery("");
+    setFoodGrams("100");
+    setShowManual(false);
+    setCustomName("");
+    setCustomKcal("");
+    setCustomProtein("");
+    setCustomCarbs("");
+    setCustomFat("");
+    setQty("1");
+  };
+
+  const confirmAdd = () => {
+    const q = num(qty, 1);
+    if (selectedProduct) {
+      addItemToMeal(addMealKey, {
+        name: selectedProduct.name + (q !== 1 ? ` ×${q}` : ""),
+        kcal: Math.round(selectedProduct.kcal * q),
+        protein: +(selectedProduct.protein * q).toFixed(1),
+        carbs: +(selectedProduct.carbs * q).toFixed(1),
+        fat: +(selectedProduct.fat * q).toFixed(1),
+      });
+    } else if (selectedFood) {
+      const g = num(foodGrams, 100) / 100;
+      addItemToMeal(addMealKey, {
+        name: `${selectedFood.name} (${foodGrams}g)`,
+        kcal: Math.round(selectedFood.kcal * g),
+        protein: +(selectedFood.protein * g).toFixed(1),
+        carbs: +(selectedFood.carbs * g).toFixed(1),
+        fat: +(selectedFood.fat * g).toFixed(1),
+      });
+    } else if (customName && customKcal) {
+      addItemToMeal(addMealKey, {
+        name: customName + (q !== 1 ? ` ×${q}` : ""),
+        kcal: Math.round(num(customKcal) * q),
+        protein: +(num(customProtein) * q).toFixed(1),
+        carbs: +(num(customCarbs) * q).toFixed(1),
+        fat: +(num(customFat) * q).toFixed(1),
+      });
+    } else {
+      return;
+    }
+    setAddMealKey(null);
+  };
+
+  const saveConsumed = () => {
+    const v = num(consumedInput, NaN);
+    if (!isNaN(v)) {
+      setDay({ ...day, consumed: Math.round(v) });
+      setConsumedInput("");
+    }
+  };
+
+  const saveProfile = () => {
+    const heightCm = num(heightInput, NaN);
+    const age = num(ageInput, NaN);
+    if (isNaN(heightCm) || isNaN(age) || !sexInput) return;
+    persist({ ...data, profile: { heightCm, age, sex: sexInput } });
+    setShowProfile(false);
+  };
+
+  const saveWeight = () => {
+    const kg = num(weightInput, NaN);
+    if (isNaN(kg)) return;
+    const comp = profile ? estimateBodyComp(kg, profile.heightCm, profile.age, profile.sex) : null;
+    const entry = { date, kg, fatPct: comp ? comp.fatPct : null, leanKg: comp ? comp.leanKg : null };
+    const weights = [...data.weights.filter((w) => w.date !== date), entry].sort((a, b) => a.date.localeCompare(b.date));
+    persist({ ...data, weights });
+    setWeightInput("");
+  };
+
+  const removeWeight = (d) => {
+    const weights = data.weights.filter((w) => w.date !== d);
+    persist({ ...data, weights });
+  };
+
+  const addProduct = () => {
+    if (!newProdName || !newProdKcal) return;
+    const prod = {
+      id: "p" + Date.now(),
+      name: newProdName,
+      portion: newProdPortion || "1 porzione",
+      kcal: num(newProdKcal),
+      protein: num(newProdProtein),
+      carbs: num(newProdCarbs),
+      fat: num(newProdFat),
+    };
+    persist({ ...data, products: [...data.products, prod] });
+    setNewProdName("");
+    setNewProdPortion("");
+    setNewProdKcal("");
+    setNewProdProtein("");
+    setNewProdCarbs("");
+    setNewProdFat("");
+  };
+
+  const removeProduct = (id) => {
+    persist({ ...data, products: data.products.filter((p) => p.id !== id) });
+  };
+
+  const chartData = data.weights.map((w) => ({
+    date: w.date,
+    label: new Date(w.date + "T00:00:00").toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }),
+    kg: w.kg,
+    fatPct: w.fatPct,
+    leanKg: w.leanKg,
+  }));
+
+  const latest = data.weights.length ? data.weights[data.weights.length - 1] : null;
+  const first = data.weights.length ? data.weights[0] : null;
+  const fatSeries = chartData.filter((d) => d.fatPct != null);
+
+  return (
+    <div style={{ minHeight: "100vh", background: PAPER, fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif", color: INK, paddingBottom: 90 }}>
+      <style>{`
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        input:focus, button:focus-visible { outline: 2px solid ${GREEN}; outline-offset: 1px; }
+        .mono { font-family: ui-monospace, 'SF Mono', Menlo, monospace; }
+        .receipt-edge {
+          background-image: radial-gradient(circle at 8px 0, transparent 7px, ${PAPER} 7px);
+          background-size: 16px 14px; background-repeat: repeat-x; height: 8px; margin-top: -1px;
+        }
+        .receipt-edge-bottom {
+          background-image: radial-gradient(circle at 8px 14px, transparent 7px, ${PAPER} 7px);
+          background-size: 16px 14px; background-repeat: repeat-x; height: 8px; margin-bottom: -1px;
+        }
+        @keyframes slideUp { from { transform: translateY(24px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+      `}</style>
+
+      <div style={{ padding: "20px 18px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <div style={{ fontSize: 12, letterSpacing: "0.12em", color: MUTED, textTransform: "uppercase" }} className="mono">Deficit del giorno</div>
+          <div style={{ fontSize: 22, fontWeight: 700, marginTop: 2 }}>{formatDateLabel(date)}</div>
+        </div>
+        <input type="date" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value)} style={{ background: CARD, border: `1px solid ${LINE}`, borderRadius: 10, padding: "8px 10px", fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 13, color: INK }} />
+      </div>
+
+      {tab === "oggi" && (
+        <div style={{ padding: "4px 18px 18px" }}>
+          <div className="receipt-edge" />
+          <div style={{ background: CARD, padding: "18px 18px 14px", boxShadow: "0 1px 0 " + LINE }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 8 }}>
+              <span style={{ color: MUTED }}>Assunte</span>
+              <span className="mono" style={{ fontWeight: 600 }}>{totals.kcal} kcal</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 14, marginBottom: 12 }}>
+              <span style={{ color: MUTED }}>Consumate (Garmin)</span>
+              {day.consumed != null ? <span className="mono" style={{ fontWeight: 600 }}>{day.consumed} kcal</span> : <span style={{ color: MUTED, fontSize: 12 }}>non inserite</span>}
+            </div>
+
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              <MacroChip label="Proteine" value={totals.protein} color={BLUE} />
+              <MacroChip label="Carbo" value={totals.carbs} color={AMBER} />
+              <MacroChip label="Grassi" value={totals.fat} color={RUST} />
+            </div>
+
+            <div style={{ borderTop: `1px dashed ${LINE}`, paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+              <span style={{ fontSize: 13, color: MUTED, textTransform: "uppercase", letterSpacing: "0.06em" }} className="mono">Deficit</span>
+              <span className="mono" style={{ fontSize: 26, fontWeight: 700, color: deficit == null ? MUTED : deficit >= 0 ? GREEN : RUST }}>
+                {deficit == null ? "—" : deficit} {deficit != null && "kcal"}
+              </span>
+            </div>
+
+            <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
+              <input inputMode="decimal" placeholder="Calorie consumate oggi" value={consumedInput} onChange={(e) => setConsumedInput(e.target.value)} style={{ flex: 1, ...inputStyle }} />
+              <button onClick={saveConsumed} style={primaryBtnStyle}>Salva</button>
+            </div>
+          </div>
+          <div className="receipt-edge-bottom" />
+
+          <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 10 }}>
+            {MEALS.map((m) => {
+              const items = day.meals[m.key] || [];
+              const subtotal = items.reduce((s, i) => s + i.kcal, 0);
+              return (
+                <div key={m.key} style={{ background: CARD, borderRadius: 14, border: `1px solid ${LINE}`, overflow: "hidden" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px" }}>
+                    <div style={{ fontWeight: 600, fontSize: 15 }}>{m.label}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span className="mono" style={{ fontSize: 13, color: MUTED }}>{subtotal} kcal</span>
+                      <button onClick={() => openAdd(m.key)} aria-label={`Aggiungi a ${m.label}`} style={roundBtnStyle}>
+                        <Plus size={16} color={INK} />
+                      </button>
+                    </div>
+                  </div>
+                  {items.length > 0 && (
+                    <div style={{ borderTop: `1px solid ${LINE}` }}>
+                      {items.map((it, idx) => (
+                        <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 14px", fontSize: 13, borderTop: idx === 0 ? "none" : `1px solid ${LINE}` }}>
+                          <div>
+                            <div style={{ color: INK }}>{it.name}</div>
+                            <div className="mono" style={{ color: MUTED, fontSize: 11, marginTop: 2 }}>P {it.protein || 0}g · C {it.carbs || 0}g · G {it.fat || 0}g</div>
+                          </div>
+                          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span className="mono" style={{ color: MUTED }}>{it.kcal} kcal</span>
+                            <button onClick={() => removeItemFromMeal(m.key, idx)} aria-label="Rimuovi" style={{ background: "none", border: "none", padding: 2, display: "flex" }}>
+                              <X size={14} color={MUTED} />
+                            </button>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {tab === "corpo" && (
+        <div style={{ padding: "4px 18px 18px" }}>
+          {!profile && !showProfile && (
+            <button
+              onClick={() => setShowProfile(true)}
+              style={{ width: "100%", background: CARD, border: `1px dashed ${LINE}`, borderRadius: 14, padding: "16px", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif", fontSize: 14, color: INK, marginBottom: 14 }}
+            >
+              <Settings2 size={16} /> Imposta altezza, età e sesso per la stima automatica
+            </button>
+          )}
+
+          {showProfile && (
+            <div style={{ background: CARD, borderRadius: 14, border: `1px solid ${LINE}`, padding: 16, marginBottom: 14 }}>
+              <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 14 }}>Il tuo profilo</div>
+              <div style={{ fontSize: 12, color: MUTED, marginBottom: 10, lineHeight: 1.4 }}>
+                Serve solo per calcolare in automatico massa grassa e massa magra da peso e altezza, senza doverle misurare tu.
+              </div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                <input inputMode="decimal" placeholder="Altezza cm" value={heightInput} onChange={(e) => setHeightInput(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                <input inputMode="numeric" placeholder="Età" value={ageInput} onChange={(e) => setAgeInput(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+              </div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <button onClick={() => setSexInput("M")} style={{ ...toggleBtnStyle, ...(sexInput === "M" ? toggleActiveStyle : {}) }}>Uomo</button>
+                <button onClick={() => setSexInput("F")} style={{ ...toggleBtnStyle, ...(sexInput === "F" ? toggleActiveStyle : {}) }}>Donna</button>
+              </div>
+              <button onClick={saveProfile} style={primaryBtnStyle}>Salva profilo</button>
+            </div>
+          )}
+
+          <div style={{ background: CARD, borderRadius: 14, border: `1px solid ${LINE}`, padding: 16 }}>
+            <div style={{ display: "flex", gap: 10, marginBottom: 4, flexWrap: "wrap" }}>
+              <StatBlock label="Peso" value={latest ? `${latest.kg} kg` : "—"} sub={first && latest ? `${(latest.kg - first.kg).toFixed(1)} kg dall'inizio` : null} color={GREEN} />
+              <StatBlock label="Massa grassa" value={latest?.fatPct != null ? `${latest.fatPct}%` : "—"} sub={first?.fatPct != null && latest?.fatPct != null ? `${(latest.fatPct - first.fatPct).toFixed(1)}% dall'inizio` : null} color={RUST} />
+              <StatBlock label="Massa magra" value={latest?.leanKg != null ? `${latest.leanKg} kg` : "—"} sub={first?.leanKg != null && latest?.leanKg != null ? `${(latest.leanKg - first.leanKg).toFixed(1)} kg dall'inizio` : null} color={BLUE} />
+            </div>
+            {profile && (
+              <div style={{ fontSize: 11, color: MUTED, marginBottom: 12, lineHeight: 1.4 }}>
+                Stima automatica da peso, altezza, età e sesso (formula BMI) — un'indicazione di massima, non equivale a una bioimpedenziometria.{" "}
+                <span onClick={() => setShowProfile(true)} style={{ textDecoration: "underline", cursor: "pointer" }}>Modifica profilo</span>
+              </div>
+            )}
+
+            {chartData.length > 1 && (
+              <div style={{ marginBottom: 10 }}>
+                <MiniLineChart data={chartData} dataKey="kg" color={GREEN} height={130} />
+              </div>
+            )}
+
+            {fatSeries.length > 1 && (
+              <div style={{ marginBottom: 4 }}>
+                <div style={{ fontSize: 11, color: MUTED, textTransform: "uppercase", marginBottom: 4 }} className="mono">Massa grassa % (stima)</div>
+                <MiniLineChart data={fatSeries} dataKey="fatPct" color={RUST} height={90} />
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+              <input inputMode="decimal" placeholder={`Peso del ${formatDateLabel(date)} (kg)`} value={weightInput} onChange={(e) => setWeightInput(e.target.value)} style={{ flex: 1, ...inputStyle }} />
+              <button onClick={saveWeight} style={primaryBtnStyle}>Salva</button>
+            </div>
+          </div>
+
+          {data.weights.length > 0 && (
+            <div style={{ marginTop: 14, background: CARD, borderRadius: 14, border: `1px solid ${LINE}`, overflow: "hidden" }}>
+              {[...data.weights].reverse().map((w, idx) => (
+                <div key={w.date} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderTop: idx === 0 ? "none" : `1px solid ${LINE}`, fontSize: 13 }}>
+                  <span style={{ color: MUTED }}>{formatDateLabel(w.date)}</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 10 }} className="mono">
+                    <span style={{ fontWeight: 600 }}>{w.kg} kg</span>
+                    {w.fatPct != null && <span style={{ color: RUST, fontSize: 12 }}>{w.fatPct}% MG</span>}
+                    {w.leanKg != null && <span style={{ color: BLUE, fontSize: 12 }}>{w.leanKg}kg MM</span>}
+                    <button onClick={() => removeWeight(w.date)} style={{ background: "none", border: "none", display: "flex" }}>
+                      <Trash2 size={14} color={MUTED} />
+                    </button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "prodotti" && (
+        <div style={{ padding: "4px 18px 18px" }}>
+          <div style={{ background: CARD, borderRadius: 14, border: `1px solid ${LINE}`, padding: 16, marginBottom: 14 }}>
+            <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 14 }}>Nuovo prodotto</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <input placeholder="Nome (es. Latte parzialmente scremato)" value={newProdName} onChange={(e) => setNewProdName(e.target.value)} style={inputStyle} />
+              <div style={{ display: "flex", gap: 8 }}>
+                <input placeholder="Porzione (es. 100 g)" value={newProdPortion} onChange={(e) => setNewProdPortion(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                <input inputMode="decimal" placeholder="Kcal" value={newProdKcal} onChange={(e) => setNewProdKcal(e.target.value)} style={{ ...inputStyle, width: 80 }} />
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input inputMode="decimal" placeholder="Proteine g" value={newProdProtein} onChange={(e) => setNewProdProtein(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                <input inputMode="decimal" placeholder="Carbo g" value={newProdCarbs} onChange={(e) => setNewProdCarbs(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                <input inputMode="decimal" placeholder="Grassi g" value={newProdFat} onChange={(e) => setNewProdFat(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+              </div>
+              <button onClick={addProduct} style={primaryBtnStyle}>Aggiungi alla mappa</button>
+            </div>
+          </div>
+
+          <div style={{ background: CARD, borderRadius: 14, border: `1px solid ${LINE}`, overflow: "hidden" }}>
+            {data.products.map((p, idx) => (
+              <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", borderTop: idx === 0 ? "none" : `1px solid ${LINE}` }}>
+                <div>
+                  <div style={{ fontSize: 14 }}>{p.name}</div>
+                  <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }} className="mono">{p.portion} · P {p.protein}g C {p.carbs}g G {p.fat}g</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span className="mono" style={{ fontWeight: 600, fontSize: 14 }}>{p.kcal} kcal</span>
+                  <button onClick={() => removeProduct(p.id)} style={{ background: "none", border: "none", display: "flex" }}>
+                    <Trash2 size={14} color={MUTED} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: CARD, borderTop: `1px solid ${LINE}`, display: "flex", padding: "8px 10px calc(8px + env(safe-area-inset-bottom))", gap: 6 }}>
+        <TabButton icon={<Utensils size={18} />} label="Oggi" active={tab === "oggi"} onClick={() => setTab("oggi")} />
+        <TabButton icon={<Scale size={18} />} label="Corpo" active={tab === "corpo"} onClick={() => setTab("corpo")} />
+        <TabButton icon={<TrendingDown size={18} />} label="Prodotti" active={tab === "prodotti"} onClick={() => setTab("prodotti")} />
+      </div>
+
+      {addMealKey && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(38,43,35,0.4)", display: "flex", alignItems: "flex-end", zIndex: 20 }} onClick={() => setAddMealKey(null)}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: PAPER, width: "100%", maxHeight: "85vh", overflowY: "auto", borderRadius: "20px 20px 0 0", padding: "16px 18px calc(20px + env(safe-area-inset-bottom))", animation: "slideUp 0.2s ease-out" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 17 }}>Aggiungi a {MEALS.find((m) => m.key === addMealKey)?.label}</div>
+              <button onClick={() => setAddMealKey(null)} style={{ background: "none", border: "none" }}>
+                <X size={20} color={INK} />
+              </button>
+            </div>
+
+            <div style={{ fontSize: 12, color: MUTED, textTransform: "uppercase", marginBottom: 8 }} className="mono">Dalla mappa prodotti</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+              {data.products.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => { setSelectedProduct(p); setSelectedFood(null); setCustomName(""); setCustomKcal(""); }}
+                  style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    background: selectedProduct?.id === p.id ? INK : CARD,
+                    color: selectedProduct?.id === p.id ? CARD : INK,
+                    border: `1px solid ${selectedProduct?.id === p.id ? INK : LINE}`,
+                    borderRadius: 10, padding: "10px 12px", textAlign: "left", fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
+                  }}
+                >
+                  <span style={{ fontSize: 13 }}>{p.name} <span className="mono" style={{ opacity: 0.7, fontSize: 11 }}>({p.portion})</span></span>
+                  <span className="mono" style={{ fontSize: 13, fontWeight: 600 }}>{p.kcal} kcal</span>
+                </button>
+              ))}
+            </div>
+
+            <div style={{ fontSize: 12, color: MUTED, textTransform: "uppercase", marginBottom: 8 }} className="mono">Cerca un alimento (calcolo automatico)</div>
+            <input
+              placeholder="Es. miele, pasta, pollo..."
+              value={foodQuery}
+              onChange={(e) => { setFoodQuery(e.target.value); setSelectedFood(null); setSelectedProduct(null); }}
+              style={{ ...inputStyle, width: "100%", marginBottom: 6 }}
+            />
+            {foodMatches.length > 0 && !selectedFood && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+                {foodMatches.map((f) => (
+                  <button
+                    key={f.name}
+                    onClick={() => { setSelectedFood(f); setFoodQuery(f.name); setSelectedProduct(null); setFoodGrams(f.presets ? String(f.presets[0].grams) : "100"); }}
+                    style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: CARD, border: `1px solid ${LINE}`, borderRadius: 10, padding: "9px 12px", textAlign: "left", fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" }}
+                  >
+                    <span style={{ fontSize: 13 }}>{f.name}</span>
+                    <span className="mono" style={{ fontSize: 12, color: MUTED }}>{f.kcal} kcal/100g</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {selectedFood && (
+              <div style={{ marginBottom: 14 }}>
+                {selectedFood.presets && (
+                  <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+                    {selectedFood.presets.map((p) => (
+                      <button
+                        key={p.label}
+                        onClick={() => setFoodGrams(String(p.grams))}
+                        style={{
+                          background: num(foodGrams) === p.grams ? INK : CARD,
+                          color: num(foodGrams) === p.grams ? CARD : INK,
+                          border: `1px solid ${num(foodGrams) === p.grams ? INK : LINE}`,
+                          borderRadius: 20, padding: "6px 12px", fontSize: 12,
+                          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
+                        }}
+                      >
+                        {p.label} <span className="mono" style={{ opacity: 0.7 }}>({p.grams}g)</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, background: CARD, border: `1px solid ${LINE}`, borderRadius: 10, padding: "10px 12px" }}>
+                  <span style={{ fontSize: 13, flex: 1 }}>{selectedFood.name}</span>
+                  <input inputMode="decimal" value={foodGrams} onChange={(e) => setFoodGrams(e.target.value)} style={{ ...inputStyle, width: 60, padding: "6px 8px" }} />
+                  <span style={{ fontSize: 12, color: MUTED }}>g</span>
+                  <span className="mono" style={{ fontSize: 13, fontWeight: 600, color: GREEN }}>
+                    {Math.round(selectedFood.kcal * (num(foodGrams, 100) / 100))} kcal
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {!showManual && !selectedFood && (
+              <button onClick={() => setShowManual(true)} style={{ background: "none", border: "none", color: MUTED, fontSize: 12, textDecoration: "underline", padding: "4px 0 16px" }}>
+                Non lo trovi? Inserisci i valori a mano
+              </button>
+            )}
+
+            {showManual && (
+              <>
+                <div style={{ fontSize: 12, color: MUTED, textTransform: "uppercase", marginBottom: 8 }} className="mono">Inserisci a mano</div>
+                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                  <input placeholder="Cosa hai mangiato" value={customName} onChange={(e) => { setCustomName(e.target.value); setSelectedProduct(null); setSelectedFood(null); }} style={{ ...inputStyle, flex: 1 }} />
+                  <input inputMode="decimal" placeholder="Kcal *" value={customKcal} onChange={(e) => { setCustomKcal(e.target.value); setSelectedProduct(null); }} style={{ ...inputStyle, width: 78, borderColor: !customKcal && customName ? RUST : LINE }} />
+                </div>
+                <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                  <input inputMode="decimal" placeholder="Proteine g" value={customProtein} onChange={(e) => setCustomProtein(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                  <input inputMode="decimal" placeholder="Carbo g" value={customCarbs} onChange={(e) => setCustomCarbs(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                  <input inputMode="decimal" placeholder="Grassi g" value={customFat} onChange={(e) => setCustomFat(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                </div>
+              </>
+            )}
+
+            {(selectedProduct || (showManual && customName)) && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                <span style={{ fontSize: 13, color: MUTED }}>Quantità (×)</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <button onClick={() => setQty((q) => Math.max(0.5, num(q, 1) - 0.5).toString())} style={roundBtnStyle}>
+                    <Minus size={14} color={INK} />
+                  </button>
+                  <span className="mono" style={{ width: 34, textAlign: "center", fontSize: 15, fontWeight: 600 }}>{qty}</span>
+                  <button onClick={() => setQty((q) => (num(q, 1) + 0.5).toString())} style={roundBtnStyle}>
+                    <Plus size={14} color={INK} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={confirmAdd}
+              disabled={!selectedProduct && !selectedFood && !(customName && customKcal)}
+              style={{ width: "100%", background: !selectedProduct && !selectedFood && !(customName && customKcal) ? MUTED : GREEN, color: CARD, border: "none", borderRadius: 12, padding: "13px 0", fontWeight: 700, fontSize: 15, fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+            >
+              <Check size={17} /> Aggiungi
+            </button>
+          </div>
+        </div>
+      )}
+
+      {saveError && (
+        <button
+          onClick={retrySave}
+          style={{ position: "fixed", top: 12, left: 18, right: 18, background: RUST, color: CARD, border: "none", borderRadius: 10, padding: "10px 12px", fontSize: 12, textAlign: "center", zIndex: 30, fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" }}
+        >
+          Salvataggio non riuscito — tocca per riprovare
+          {errorDetail ? <div className="mono" style={{ fontSize: 10, opacity: 0.85, marginTop: 3 }}>{errorDetail}</div> : null}
+        </button>
+      )}
+    </div>
+  );
+}
+
+const inputStyle = {
+  border: `1px solid ${LINE}`,
+  borderRadius: 10,
+  padding: "10px 12px",
+  fontSize: 14,
+  fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
+  background: CARD,
+  color: INK,
+};
+
+const primaryBtnStyle = {
+  background: INK,
+  color: CARD,
+  border: "none",
+  borderRadius: 10,
+  padding: "0 16px",
+  fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
+  fontWeight: 600,
+  fontSize: 14,
+};
+
+const roundBtnStyle = {
+  background: PAPER,
+  border: `1px solid ${LINE}`,
+  borderRadius: 8,
+  width: 30,
+  height: 30,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const toggleBtnStyle = {
+  flex: 1,
+  background: CARD,
+  border: `1px solid ${LINE}`,
+  borderRadius: 10,
+  padding: "9px 0",
+  fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
+  fontSize: 13,
+  color: INK,
+};
+
+const toggleActiveStyle = {
+  background: INK,
+  color: CARD,
+  borderColor: INK,
+};
+
+function MacroChip({ label, value, color }) {
+  return (
+    <div style={{ flex: 1, background: PAPER, borderRadius: 10, padding: "8px 10px", textAlign: "center" }}>
+      <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: "0.04em" }} className="mono">{label}</div>
+      <div className="mono" style={{ fontSize: 15, fontWeight: 700, color }}>{value}g</div>
+    </div>
+  );
+}
+
+function StatBlock({ label, value, sub, color }) {
+  return (
+    <div style={{ flex: "1 1 30%", minWidth: 90 }}>
+      <div style={{ fontSize: 11, color: MUTED, textTransform: "uppercase" }} className="mono">{label}</div>
+      <div className="mono" style={{ fontSize: 19, fontWeight: 700, color }}>{value}</div>
+      {sub && <div style={{ fontSize: 10, color: MUTED }} className="mono">{sub}</div>}
+    </div>
+  );
+}
+
+function MiniLineChart({ data, dataKey, color, height = 130 }) {
+  const width = 320;
+  const padTop = 14, padBottom = 20, padX = 6;
+  const values = data.map((d) => d[dataKey]);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const innerH = height - padTop - padBottom;
+  const stepX = data.length > 1 ? (width - padX * 2) / (data.length - 1) : 0;
+
+  const points = data.map((d, i) => {
+    const x = padX + i * stepX;
+    const y = padTop + innerH - ((d[dataKey] - min) / range) * innerH;
+    return { x, y, label: d.label, value: d[dataKey] };
+  });
+
+  const path = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
+  const showEvery = Math.max(1, Math.ceil(points.length / 5));
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height }} preserveAspectRatio="none">
+      <line x1={padX} y1={padTop} x2={width - padX} y2={padTop} stroke={LINE} strokeWidth="1" />
+      <line x1={padX} y1={height - padBottom} x2={width - padX} y2={height - padBottom} stroke={LINE} strokeWidth="1" />
+      <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {points.map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y} r="2.5" fill={color} />
+      ))}
+      {points.map((p, i) =>
+        i % showEvery === 0 || i === points.length - 1 ? (
+          <text key={i} x={p.x} y={height - 5} fontSize="9" fill={MUTED} textAnchor="middle" fontFamily="ui-monospace, 'SF Mono', Menlo, monospace">
+            {p.label}
+          </text>
+        ) : null
+      )}
+    </svg>
+  );
+}
+
+function TabButton({ icon, label, active, onClick }) {
+  return (
+    <button onClick={onClick} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: "none", border: "none", padding: "6px 0", color: active ? INK : MUTED, fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" }}>
+      {icon}
+      <span style={{ fontSize: 11, fontWeight: active ? 700 : 500 }}>{label}</span>
+    </button>
+  );
+}
