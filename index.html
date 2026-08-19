@@ -412,7 +412,13 @@ function DeficitTracker() {
     const heightCm = num(heightInput, NaN);
     const age = num(ageInput, NaN);
     if (isNaN(heightCm) || isNaN(age) || !sexInput) return;
-    persist({ ...data, profile: { heightCm, age, sex: sexInput } });
+    const profile = { heightCm, age, sex: sexInput };
+    // Ricalcola anche i pesi già salvati (es. registrati prima di impostare il profilo).
+    const weights = data.weights.map((w) => {
+      const comp = estimateBodyComp(w.kg, profile.heightCm, profile.age, profile.sex);
+      return comp ? { ...w, fatPct: comp.fatPct, leanKg: comp.leanKg } : w;
+    });
+    persist({ ...data, profile, weights });
     setShowProfile(false);
   };
 
