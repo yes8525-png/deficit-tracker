@@ -19,5 +19,5 @@ Basta aprire `index.html` in un server statico qualsiasi (es. `npx serve .`) o o
 Nota: aprendo `index.html` direttamente come file locale (`file://`) l'app funziona (localStorage funziona anche su file://), ma il service worker per l'uso offline richiede http/https — per l'uso reale conviene ospitarla.
 
 ## Possibili sviluppi futuri
-- Esportare/importare i dati (backup manuale, dato che `localStorage` non sincronizza tra dispositivi).
-- Editor per rinominare/modificare i prodotti salvati.
+- ~~Esportare/importare i dati (backup manuale, dato che `localStorage` non sincronizza tra dispositivi).~~ Fatto: tab Prodotti → card "Backup dati" (esporta JSON, importa con conferma e validazione formato).
+- ~~Editor per rinominare/modificare i prodotti salvati.~~ Fatto: icona matita su ogni prodotto della mappa, apre un form di modifica inline.
