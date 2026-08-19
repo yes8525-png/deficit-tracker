@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - claude/deficit-tracker-resume-agkrxz
   workflow_dispatch:
 
 permissions:
