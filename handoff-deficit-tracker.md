@@ -8,7 +8,11 @@ Web app (PWA) offline-first per tracciare deficit calorico giornaliero: pasti (c
 - **`vendor/`** — copie locali di React 18, ReactDOM 18 e Babel standalone (per il transform JSX in-browser).
 - **`manifest.webmanifest`** + **`icons/`** — per "Aggiungi a Home" su iOS.
 - **`sw.js`** — service worker che cachea l'app shell per l'uso offline.
-- **Persistenza**: `localStorage` (chiave `tracker-data`), sincrona e locale al dispositivo — niente più `window.storage`.
+- **Persistenza**: doppia.
+  - `localStorage` (chiave `tracker-data`) — cache locale sincrona, usata per il primo render e come fallback offline.
+  - **Supabase** (tabella `tracker_state`, riga fissa con id `28434d49-5166-4e1d-a293-b9ac185df4d6`, progetto `odnadjqepoeqnyldduod`) — fonte di verità. Ad ogni avvio l'app scarica questa riga e la usa al posto del locale; ad ogni salvataggio scrive sia in locale che su Supabase. Introdotta perché su iOS il solo `localStorage` (specie per PWA da schermata Home) può venire svuotato da Safari senza preavviso — con Supabase i dati sopravvivono a quello, e sono anche identici su qualunque dispositivo/browser si apra il link.
+  - Il piccolo indicatore in alto a destra (● salvato online / salvataggio… / offline · solo locale) mostra lo stato della sincronizzazione col server.
+  - Sicurezza: nessun vero login (app mono-utente). La client key di Supabase è pubblica per design (embeddata nel JS, repo pubblico); le RLS policy limitano le operazioni alla singola riga con quell'id fisso, ma chiunque trovasse quell'id nel sorgente potrebbe leggerlo/sovrascriverlo. Accettabile per dati personali di fitness non critici; se in futuro serve isolamento vero, va aggiunta autenticazione.
 
 ## Storico: perché non è più un Artifact React
 Il vecchio `deficit-tracker.jsx` (ancora presente per riferimento, non più usato) era pensato per girare come Artifact di Claude e usava `window.storage.get/set`, un'API disponibile **solo** dentro il runtime degli Artifact. Il salvataggio falliva sistematicamente ("Storage set failed: Unexpected response type") perché fuori da quel contesto l'API semplicemente non esiste — non era un bug risolvibile con retry. Il file è stato riscritto come `index.html` standalone con `localStorage`, che è sincrono e affidabile.
@@ -25,3 +29,5 @@ Importante: i dati (`localStorage`) sono legati al dominio/origine visitata — 
 ## Possibili sviluppi futuri
 - ~~Esportare/importare i dati (backup manuale, dato che `localStorage` non sincronizza tra dispositivi).~~ Fatto: tab Prodotti → card "Backup dati" (esporta JSON, importa con conferma e validazione formato).
 - ~~Editor per rinominare/modificare i prodotti salvati.~~ Fatto: icona matita su ogni prodotto della mappa, apre un form di modifica inline.
+- ~~I dati sparivano su iOS (Safari/PWA svuotava `localStorage`).~~ Fatto: i dati ora vivono su Supabase, `localStorage` resta solo come cache/fallback offline.
+- Se un giorno servisse davvero multi-utente o maggiore sicurezza: aggiungere autenticazione Supabase (es. magic link via email) invece della riga fissa condivisa dalla client key pubblica.

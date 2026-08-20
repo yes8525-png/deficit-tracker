@@ -18,6 +18,7 @@
 <script src="vendor/react.production.min.js"></script>
 <script src="vendor/react-dom.production.min.js"></script>
 <script src="vendor/babel.min.js"></script>
+<script src="vendor/supabase.js"></script>
 </head>
 <body>
 <div id="root"></div>
@@ -37,6 +38,15 @@ const LINE = "#D8D0BC";
 
 const STORAGE_KEY = "tracker-data";
 const WATER_TARGET_DEFAULT = 2000;
+
+// Cloud sync: the app is single-user with no login, so it always reads and
+// writes one fixed row. Storing data only in localStorage meant it could be
+// silently wiped by iOS (Safari's storage limits, PWA/home-screen quirks) -
+// Supabase gives the data a home that survives that.
+const SUPABASE_URL = "https://odnadjqepoeqnyldduod.supabase.co";
+const SUPABASE_KEY = "sb_publishable_2R4lK4jdNHXLg6Ramxx3PA_ioaUMA_A";
+const SUPABASE_ROW_ID = "28434d49-5166-4e1d-a293-b9ac185df4d6";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const MEALS = [
   { key: "colazione", label: "Colazione" },
@@ -265,6 +275,8 @@ function DeficitTracker() {
   const [editFat, setEditFat] = useState("");
   const [backupMsg, setBackupMsg] = useState(null);
   const fileInputRef = useRef(null);
+  const [cloudStatus, setCloudStatus] = useState("loading");
+  const cloudReadyRef = useRef(false);
 
   useEffect(() => {
     if (data.profile) {
@@ -275,11 +287,55 @@ function DeficitTracker() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Al primo avvio il cloud (Supabase) è la fonte di verità: se esiste già
+  // una riga la usiamo al posto di quella locale (che su iOS può essere
+  // stata svuotata da Safari); se non esiste ancora, la creiamo dal locale.
+  useEffect(() => {
+    let cancelled = false;
+    supabaseClient
+      .from("tracker_state")
+      .select("data")
+      .eq("id", SUPABASE_ROW_ID)
+      .maybeSingle()
+      .then(({ data: row, error }) => {
+        if (cancelled) return;
+        if (error) {
+          setCloudStatus("offline");
+          cloudReadyRef.current = true;
+          return;
+        }
+        if (row && row.data) {
+          const merged = { products: DEFAULT_PRODUCTS, days: {}, weights: [], profile: null, waterTarget: WATER_TARGET_DEFAULT, ...row.data };
+          setData(merged);
+          saveToStorage(merged);
+        } else {
+          supabaseClient.from("tracker_state").upsert({ id: SUPABASE_ROW_ID, data, updated_at: new Date().toISOString() }).then(() => {}).catch(() => {});
+        }
+        setCloudStatus("synced");
+        cloudReadyRef.current = true;
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCloudStatus("offline");
+        cloudReadyRef.current = true;
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const persist = useCallback((next) => {
     setData(next);
     const ok = saveToStorage(next);
     setSaveError(!ok);
     lastFailedRef.current = ok ? null : next;
+    if (cloudReadyRef.current) {
+      setCloudStatus("saving");
+      supabaseClient
+        .from("tracker_state")
+        .upsert({ id: SUPABASE_ROW_ID, data: next, updated_at: new Date().toISOString() })
+        .then(({ error }) => setCloudStatus(error ? "offline" : "synced"))
+        .catch(() => setCloudStatus("offline"));
+    }
   }, []);
 
   const retrySave = useCallback(() => {
@@ -565,7 +621,10 @@ function DeficitTracker() {
           <div style={{ fontSize: 12, letterSpacing: "0.12em", color: MUTED, textTransform: "uppercase" }} className="mono">Deficit del giorno</div>
           <div style={{ fontSize: 22, fontWeight: 700, marginTop: 2 }}>{formatDateLabel(date)}</div>
         </div>
-        <input type="date" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value)} style={{ background: CARD, border: `1px solid ${LINE}`, borderRadius: 10, padding: "8px 10px", fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 13, color: INK }} />
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+          <input type="date" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value)} style={{ background: CARD, border: `1px solid ${LINE}`, borderRadius: 10, padding: "8px 10px", fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 13, color: INK }} />
+          <CloudStatus status={cloudStatus} />
+        </div>
       </div>
 
       {tab === "oggi" && (
@@ -1068,6 +1127,22 @@ const toggleActiveStyle = {
   color: CARD,
   borderColor: INK,
 };
+
+function CloudStatus({ status }) {
+  const map = {
+    loading: { text: "connessione…", color: MUTED },
+    saving: { text: "salvataggio…", color: AMBER },
+    synced: { text: "salvato online", color: GREEN },
+    offline: { text: "offline · solo locale", color: RUST },
+  };
+  const s = map[status] || map.loading;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, color: s.color }} className="mono">
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
+      {s.text}
+    </div>
+  );
+}
 
 function MacroChip({ label, value, color }) {
   return (
