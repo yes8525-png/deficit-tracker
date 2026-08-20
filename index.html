@@ -560,7 +560,7 @@ function DeficitTracker() {
         @keyframes slideUp { from { transform: translateY(24px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
       `}</style>
 
-      <div style={{ padding: "20px 18px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ padding: "calc(20px + env(safe-area-inset-top)) 18px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
           <div style={{ fontSize: 12, letterSpacing: "0.12em", color: MUTED, textTransform: "uppercase" }} className="mono">Deficit del giorno</div>
           <div style={{ fontSize: 22, fontWeight: 700, marginTop: 2 }}>{formatDateLabel(date)}</div>
@@ -1000,7 +1000,7 @@ function DeficitTracker() {
       {saveError && (
         <button
           onClick={retrySave}
-          style={{ position: "fixed", top: 12, left: 18, right: 18, background: RUST, color: CARD, border: "none", borderRadius: 10, padding: "10px 12px", fontSize: 12, textAlign: "center", zIndex: 30, fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" }}
+          style={{ position: "fixed", top: "calc(12px + env(safe-area-inset-top))", left: 18, right: 18, background: RUST, color: CARD, border: "none", borderRadius: 10, padding: "10px 12px", fontSize: 12, textAlign: "center", zIndex: 30, fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" }}
         >
           Salvataggio non riuscito (spazio esaurito o modalità privata) — tocca per riprovare
         </button>
