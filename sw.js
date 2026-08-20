@@ -1,4 +1,4 @@
-const CACHE_NAME = "deficit-tracker-v1";
+const CACHE_NAME = "deficit-tracker-v2";
 const PRECACHE = [
   "./",
   "./index.html",
@@ -27,16 +27,16 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  // Network-first: always try to fetch the latest version so deploys show
+  // up without a stale service-worker cache getting in the way. Falls back
+  // to the cache only when offline.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-          return res;
-        })
-        .catch(() => cached);
-    })
+    fetch(event.request)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        return res;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
