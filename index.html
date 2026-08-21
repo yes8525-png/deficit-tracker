@@ -1246,7 +1246,15 @@ function MiniLineChart({ data, dataKey, color, height = 130 }) {
       ))}
       {points.map((p, i) =>
         i % showEvery === 0 || i === points.length - 1 ? (
-          <text key={i} x={p.x} y={height - 5} fontSize="9" fill={MUTED} textAnchor="middle" fontFamily="ui-monospace, 'SF Mono', Menlo, monospace">
+          <text
+            key={i}
+            x={p.x}
+            y={height - 5}
+            fontSize="9"
+            fill={MUTED}
+            textAnchor={i === 0 ? "start" : i === points.length - 1 ? "end" : "middle"}
+            fontFamily="ui-monospace, 'SF Mono', Menlo, monospace"
+          >
             {p.label}
           </text>
         ) : null
